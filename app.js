@@ -773,3 +773,26 @@ const loadScript = (src, callback) => {
 
 loadScript("https://accounts.google.com/gsi/client", gisLoaded);
 loadScript("https://apis.google.com/js/api.js", gapiLoaded);
+
+// --- Split Text Animation ---
+function initSplitText() {
+    const brandTitle = document.getElementById('brand-title');
+    if (!brandTitle) return;
+    
+    const text = brandTitle.innerText;
+    brandTitle.innerHTML = '';
+    
+    text.split('').forEach((char, i) => {
+        const span = document.createElement('span');
+        span.className = 'char';
+        span.innerText = char;
+        // Stagger the animation delay for each character
+        span.style.animationDelay = `${i * 0.05}s`;
+        if (char === ' ') {
+            span.innerHTML = '&nbsp;';
+        }
+        brandTitle.appendChild(span);
+    });
+}
+initSplitText();
+
