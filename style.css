@@ -47,13 +47,11 @@ body {
     justify-content: center;
     align-items: center;
     height: 100vh;
-    background: #f0f3f6; /* Neumorphic off-white */
+    background: #ffffff;
 }
 .login-box {
-    background: #f0f3f6;
+    background: #ffffff;
     padding: 4rem 3rem;
-    border-radius: 20px;
-    box-shadow: 10px 10px 20px #d1d9e6, -10px -10px 20px #ffffff;
     text-align: center;
     display: flex;
     flex-direction: column;
@@ -61,16 +59,15 @@ body {
     min-width: 400px;
 }
 #brand-title {
-    margin-bottom: 0.5rem; 
+    margin-bottom: 2rem; 
     font-weight: 700; 
     letter-spacing: -0.02em;
-    font-size: 3.5rem;
-    color: #f0f3f6;
-    text-shadow: 3px 3px 6px rgba(0,0,0,0.15), -3px -3px 6px rgba(255,255,255,1);
+    font-size: 4rem;
+    color: #ffffff;
+    text-shadow: 0px 4px 15px rgba(0,0,0,0.12);
     display: flex;
     justify-content: center;
 }
-.login-box p { color: #888; margin-bottom: 2.5rem; font-size: 1.1rem; }
 
 /* Google Auth Button */
 .auth-btn {
@@ -457,11 +454,13 @@ body.dark-mode .format-menu {
     background: #0a0a0a;
     border-color: #222;
     color: #a0a0a0;
-    box-shadow: 10px 10px 20px #000, -10px -10px 20px #151515;
+}
+body.dark-mode .login-box {
+    background: var(--bg-color);
 }
 body.dark-mode #brand-title {
-    color: #050505;
-    text-shadow: 3px 3px 6px #000, -3px -3px 6px #151515;
+    color: var(--bg-color);
+    text-shadow: 0px 4px 15px rgba(255,255,255,0.12);
 }
 body.dark-mode .setting-group {
     background: var(--bg-color);
