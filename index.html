@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Writing</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="login-screen">
+        <div class="login-box">
+            <h1>Minimal Writing</h1>
+            <p>Sign in with Google to sync your writing securely</p>
+            <button id="auth-button" class="btn primary">Sign in to Authorize</button>
+        </div>
+    </div>
+
+    <div id="app" class="hidden">
+        <button id="menu-toggle" class="icon-btn" aria-label="Toggle Menu">
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h2>Pages</h2>
+                <button id="new-page-btn" class="icon-btn" title="New Page">
+                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+            </div>
+            <ul id="page-list" class="page-list">
+                <!-- Pages will be populated here -->
+            </ul>
+            <div class="sidebar-footer">
+                <button id="settings-btn" class="btn text-btn">Settings</button>
+                <button id="logout-btn" class="btn text-btn">Log out</button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <input type="text" id="page-title" class="page-title-input" placeholder="Page Title" autocomplete="off">
+            <div id="editor" class="editor" contenteditable="true" placeholder="Start writing... Type @ for formatting"></div>
+        </main>
+        
+        <div id="format-menu" class="format-menu hidden">
+            <!-- Format options populated by JS -->
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="delete-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Are you sure?</h3>
+            <p>This page will be permanently deleted.</p>
+            <div class="modal-actions">
+                <button id="cancel-delete-btn" class="btn secondary">No, cancel</button>
+                <button id="confirm-delete-btn" class="btn danger">Yes, delete</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal hidden">
+        <div class="modal-content settings-content">
+            <h3>Settings</h3>
+            <div class="settings-scroll" id="settings-container">
+                <!-- Settings populated by JS -->
+            </div>
+            <div class="modal-actions">
+                <button id="close-settings-btn" class="btn primary">Done</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
