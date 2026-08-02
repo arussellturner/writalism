@@ -41,7 +41,9 @@ const logoutBtn = document.getElementById('logout-btn');
 const settingsBtn = document.getElementById('settings-btn');
 const formatMenu = document.getElementById('format-menu');
 const deleteModal = document.getElementById('delete-modal');
-const settingsModal = document.getElementById('settings-modal');
+const sidebarPages = document.getElementById('sidebar-pages');
+const sidebarSettings = document.getElementById('sidebar-settings');
+const themeToggleBtn = document.getElementById('theme-toggle-btn');
 
 // --- Google API Initialization ---
 function gapiLoaded() {
@@ -106,26 +108,30 @@ async function loadDataFromDrive() {
     try {
         let response = await gapi.client.drive.files.list({
             spaces: 'appDataFolder',
-            fields: 'files(id, name)',
+            q: "name='minimal_writing_data.json'",
+            fields: 'files(id, name, modifiedTime)',
+            orderBy: 'modifiedTime desc',
             pageSize: 10
         });
         
         let files = response.result.files;
-        let dataFile = files.find(f => f.name === 'minimal_writing_data.json');
+        let dataFile = files.length > 0 ? files[0] : null;
         
         if (dataFile) {
             dataFileId = dataFile.id;
-            let fileResponse = await gapi.client.drive.files.get({
-                fileId: dataFileId,
-                alt: 'media'
+            let fileResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${dataFileId}?alt=media`, {
+                headers: { 'Authorization': 'Bearer ' + accessToken }
             });
-            let data = fileResponse.result;
-            if (data && typeof data === 'object') {
+            
+            if (fileResponse.ok) {
+                let data = await fileResponse.json();
                 state = { ...state, ...data };
                 if (!state.settings) state.settings = {};
+            } else {
+                console.error("Failed to load file content.");
             }
         } else {
-            state.pages = [{ id: Date.now().toString(), title: 'Untitled', content: '<div><br></div>', lastModified: Date.now() }];
+            state.pages = [{ id: Date.now().toString(), title: 'Untitled', content: '<div><br></div>', created: Date.now(), lastModified: Date.now() }];
             state.activePageId = state.pages[0].id;
             await saveToDrive(true);
         }
@@ -147,27 +153,39 @@ async function saveToDrive(isNew = false) {
     if (!accessToken) return;
     
     const fileContent = JSON.stringify(state);
-    const file = new Blob([fileContent], { type: 'application/json' });
-    const metadata = { name: 'minimal_writing_data.json', parents: ['appDataFolder'] };
-
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('file', file);
-
-    const url = isNew || !dataFileId 
-        ? 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart'
-        : `https://www.googleapis.com/upload/drive/v3/files/${dataFileId}?uploadType=multipart`;
-        
-    const method = isNew || !dataFileId ? 'POST' : 'PATCH';
 
     try {
-        let res = await fetch(url, {
-            method: method,
-            headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
-            body: form
+        if (isNew || !dataFileId) {
+            let metaRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+                method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + accessToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name: 'minimal_writing_data.json', parents: ['appDataFolder'] })
+            });
+            if (metaRes.status === 401) {
+                alert("Your session has expired! Please copy any unsaved writing, refresh the page, and sign in again.");
+                return;
+            }
+            if (!metaRes.ok) throw new Error("Failed to create file");
+            let metaVal = await metaRes.json();
+            dataFileId = metaVal.id;
+        }
+
+        let uploadRes = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${dataFileId}?uploadType=media`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': 'Bearer ' + accessToken,
+                'Content-Type': 'application/json'
+            },
+            body: fileContent
         });
-        let val = await res.json();
-        if (isNew || !dataFileId) dataFileId = val.id;
+        
+        if (uploadRes.status === 401) {
+            alert("Your session has expired! Please copy any unsaved writing, refresh the page, and sign in again.");
+            return;
+        }
     } catch(e) {
         console.error("Save error", e);
     }
@@ -186,25 +204,122 @@ function triggerSave() {
             renderSidebar();
         }
         saveToDrive();
-    }, 3000);
+    }, 1000);
 }
 
-pageTitle.addEventListener('input', triggerSave);
+function autoResizeTitle() {
+    pageTitle.style.height = 'auto';
+    pageTitle.style.height = pageTitle.scrollHeight + 'px';
+}
+
+const mainContentObserver = new ResizeObserver(() => {
+    autoResizeTitle();
+});
+mainContentObserver.observe(document.querySelector('.main-content'));
+
+pageTitle.addEventListener('input', () => {
+    autoResizeTitle();
+    triggerSave();
+});
 editor.addEventListener('input', triggerSave);
 
+pageTitle.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        editor.focus();
+        const selection = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+});
+
+// Fade out menu button when typing
+editor.addEventListener('keydown', (e) => {
+    // Only fade if it's a character or structural key
+    if(e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace') {
+        menuToggle.classList.add('fade-out');
+    }
+});
+
+const showMenuBtn = () => menuToggle.classList.remove('fade-out');
+document.addEventListener('mousemove', showMenuBtn);
+document.addEventListener('mousedown', showMenuBtn);
+document.addEventListener('touchstart', showMenuBtn);
+
 // --- UI Logic ---
-menuToggle.onclick = () => { sidebar.classList.toggle('open'); };
+let inSettingsMode = false;
+const hamburgerSVG = '<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>';
+const backArrowSVG = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>';
+
+menuToggle.onclick = () => {
+    if (inSettingsMode) {
+        inSettingsMode = false;
+        sidebarSettings.classList.add('hidden');
+        sidebarPages.classList.remove('hidden');
+        menuToggle.innerHTML = hamburgerSVG;
+    } else {
+        sidebar.classList.toggle('open');
+    }
+};
+
+document.querySelector('.main-content').addEventListener('mousedown', () => {
+    if (!inSettingsMode && sidebar.classList.contains('open')) {
+        sidebar.classList.remove('open');
+    }
+});
+
+document.getElementById('page-search')?.addEventListener('input', renderSidebar);
+document.getElementById('page-sort')?.addEventListener('change', renderSidebar);
 
 function renderSidebar() {
     pageList.innerHTML = '';
-    state.pages.sort((a,b) => b.lastModified - a.lastModified).forEach(p => {
+    const searchInput = document.getElementById('page-search');
+    const sortSelect = document.getElementById('page-sort');
+    const searchVal = searchInput ? searchInput.value.toLowerCase() : '';
+    const sortVal = sortSelect ? sortSelect.value : 'edited-new';
+    
+    let filtered = state.pages.filter(p => {
+        return (p.title || '').toLowerCase().includes(searchVal) || (p.content || '').toLowerCase().includes(searchVal);
+    });
+    
+    filtered.sort((a,b) => {
+        const aCreated = a.created || a.lastModified || parseInt(a.id);
+        const bCreated = b.created || b.lastModified || parseInt(b.id);
+        
+        if (sortVal === 'edited-new') return b.lastModified - a.lastModified;
+        if (sortVal === 'edited-old') return a.lastModified - b.lastModified;
+        if (sortVal === 'created-new') return bCreated - aCreated;
+        if (sortVal === 'created-old') return aCreated - bCreated;
+        return b.lastModified - a.lastModified;
+    });
+
+    filtered.forEach(p => {
         const li = document.createElement('li');
         li.className = `page-item ${p.id === state.activePageId ? 'active' : ''}`;
         
-        const nameSpan = document.createElement('span');
+        const aCreated = p.created || p.lastModified || parseInt(p.id);
+        const createdDate = new Date(aCreated).toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+        const editedDate = new Date(p.lastModified).toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+        
+        const infoDiv = document.createElement('div');
+        infoDiv.style.flex = '1';
+        infoDiv.style.overflow = 'hidden';
+        
+        const nameSpan = document.createElement('div');
         nameSpan.className = 'page-name';
         nameSpan.textContent = p.title || 'Untitled';
-        nameSpan.onclick = () => {
+        
+        const metaSpan = document.createElement('div');
+        metaSpan.className = 'page-meta';
+        metaSpan.innerHTML = `Created: ${createdDate}<br>Edited: ${editedDate}`;
+        
+        infoDiv.appendChild(nameSpan);
+        infoDiv.appendChild(metaSpan);
+        
+        infoDiv.onclick = () => {
             loadPage(p.id);
             if(window.innerWidth <= 768) sidebar.classList.remove('open');
         };
@@ -218,7 +333,7 @@ function renderSidebar() {
             showPageMenu(p.id, menuBtn);
         };
         
-        li.appendChild(nameSpan);
+        li.appendChild(infoDiv);
         li.appendChild(menuBtn);
         pageList.appendChild(li);
     });
@@ -273,6 +388,7 @@ function loadPage(id) {
     const page = state.pages.find(p => p.id === id);
     if (page) {
         pageTitle.value = page.title;
+        autoResizeTitle();
         editor.innerHTML = page.content;
     }
     renderSidebar();
@@ -283,6 +399,7 @@ newPageBtn.onclick = () => {
         id: Date.now().toString(),
         title: 'Untitled',
         content: '<div><br></div>',
+        created: Date.now(),
         lastModified: Date.now()
     };
     state.pages.push(newPage);
@@ -311,6 +428,7 @@ document.getElementById('confirm-delete-btn').onclick = () => {
             if(state.activePageId) loadPage(state.activePageId);
             else {
                 pageTitle.value = '';
+                autoResizeTitle();
                 editor.innerHTML = '';
             }
         }
@@ -322,6 +440,7 @@ document.getElementById('confirm-delete-btn').onclick = () => {
 
 // --- Formatting Menu (@ menu) ---
 const formats = [
+    { id: 'body', name: 'Body', cmd: 'formatBlock', val: 'P', desc: 'Normal text' },
     { id: 'h1', name: 'Header 1', cmd: 'formatBlock', val: 'H1', desc: 'Large heading' },
     { id: 'h2', name: 'Header 2', cmd: 'formatBlock', val: 'H2', desc: 'Medium heading' },
     { id: 'h3', name: 'Header 3', cmd: 'formatBlock', val: 'H3', desc: 'Small heading' },
@@ -330,7 +449,7 @@ const formats = [
     { id: 'num', name: 'Number List', cmd: 'insertOrderedList', val: null, desc: 'Ordered list' },
     { id: 'alpha', name: 'Alpha List', cmd: 'alphaList', val: null, desc: 'A, B, C list' },
     { id: 'quote', name: 'Quote', cmd: 'formatBlock', val: 'BLOCKQUOTE', desc: 'Blockquote' },
-    { id: 'code', name: 'Code', cmd: 'formatBlock', val: 'PRE', desc: 'Code block' },
+    { id: 'code', name: 'Code', cmd: 'formatBlock', val: 'P', desc: 'Code block' },
 ];
 
 let atMenuOpen = false;
@@ -394,14 +513,24 @@ function showFormatMenu() {
     // Position menu near cursor
     const selection = window.getSelection();
     if (selection.rangeCount > 0) {
-        const rect = selection.getRangeAt(0).getBoundingClientRect();
+        let rect = selection.getRangeAt(0).getBoundingClientRect();
+        
+        // Handle empty/collapsed ranges returning 0,0,0,0
+        if (rect.width === 0 && rect.height === 0) {
+            const span = document.createElement('span');
+            span.appendChild(document.createTextNode('\u200b'));
+            selection.getRangeAt(0).insertNode(span);
+            rect = span.getBoundingClientRect();
+            span.parentNode.removeChild(span);
+        }
+        
         const editorRect = editor.getBoundingClientRect();
         
-        let top = rect.bottom + 5;
-        let left = rect.left;
+        let top = rect.bottom + window.scrollY + 5;
+        let left = rect.left + window.scrollX;
         
         // boundary checks
-        if (left + 260 > window.innerWidth) left = window.innerWidth - 270;
+        if (left + 200 > window.innerWidth) left = window.innerWidth - 210;
         
         formatMenu.style.top = `${top}px`;
         formatMenu.style.left = `${left}px`;
@@ -420,7 +549,7 @@ function renderFormatMenu() {
     filtered.forEach((f, index) => {
         const div = document.createElement('div');
         div.className = `format-item ${index === atSelectedIndex ? 'selected' : ''}`;
-        div.innerHTML = `<div class="f-title">${f.name}</div><div class="f-desc">${f.desc}</div>`;
+        div.innerHTML = `<div class="f-title">${f.name}</div>`;
         div.onmousedown = (e) => {
             e.preventDefault(); 
             atSelectedIndex = index;
@@ -428,6 +557,11 @@ function renderFormatMenu() {
         };
         formatMenu.appendChild(div);
     });
+    
+    const selectedEl = formatMenu.querySelector('.format-item.selected');
+    if (selectedEl) {
+        selectedEl.scrollIntoView({ block: 'nearest' });
+    }
 }
 
 function closeFormatMenu() {
@@ -440,14 +574,21 @@ function applyFormat() {
     if (filtered.length > 0 && atMenuRange) {
         const format = filtered[atSelectedIndex];
         
-        // Select the '@' and typed filter
         const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(atMenuRange);
-        
-        // delete the @... text
-        for(let i=0; i <= atMenuFilter.length; i++){
-            document.execCommand('delete', false, null);
+        if (sel.rangeCount > 0) {
+            const range = sel.getRangeAt(0);
+            const textNode = range.startContainer;
+            if (textNode.nodeType === Node.TEXT_NODE) {
+                const endOffset = range.endOffset;
+                const startOffset = Math.max(0, endOffset - (atMenuFilter.length + 1));
+                range.setStart(textNode, startOffset);
+                
+                // Select the precise text and use browser's native delete
+                // to prevent the cursor from jumping to the previous line
+                sel.removeAllRanges();
+                sel.addRange(range);
+                document.execCommand('delete', false, null);
+            }
         }
         
         if (format.id === 'alpha') {
@@ -459,8 +600,36 @@ function applyFormat() {
             if (node && node.nodeName === 'OL') {
                 node.setAttribute('type', 'A');
             }
+        } else if (format.id === 'code') {
+            document.execCommand('formatBlock', false, 'P');
+            let node = window.getSelection().anchorNode;
+            if (node.nodeType === 3) node = node.parentNode;
+            while(node && node !== editor && node.nodeName !== 'P' && node.nodeName !== 'DIV' && !['H1','H2','H3','H4','BLOCKQUOTE','LI'].includes(node.nodeName)) {
+                node = node.parentNode;
+            }
+            if (node && node !== editor) {
+                node.className = 'code-block';
+            }
+        } else if (format.id === 'body') {
+            document.execCommand('formatBlock', false, 'P');
+            let node = window.getSelection().anchorNode;
+            if (node.nodeType === 3) node = node.parentNode;
+            while(node && node !== editor && node.nodeName !== 'P' && node.nodeName !== 'DIV' && !['H1','H2','H3','H4','BLOCKQUOTE','LI'].includes(node.nodeName)) {
+                node = node.parentNode;
+            }
+            if (node && node !== editor) {
+                node.removeAttribute('class');
+            }
         } else {
             document.execCommand(format.cmd, false, format.val);
+            let node = window.getSelection().anchorNode;
+            if (node.nodeType === 3) node = node.parentNode;
+            while(node && node !== editor && !['H1','H2','H3','H4','BLOCKQUOTE','LI','P','DIV'].includes(node.nodeName)) {
+                node = node.parentNode;
+            }
+            if (node && node !== editor && node.classList && node.classList.contains('code-block')) {
+                node.removeAttribute('class');
+            }
         }
         triggerSave();
     }
@@ -469,14 +638,25 @@ function applyFormat() {
 
 // --- Settings ---
 const settingsLabels = {
+    title: 'Page Title',
     h1: 'Header 1', h2: 'Header 2', h3: 'Header 3', h4: 'Header 4',
+    body: 'Body Text',
     bullet: 'Bullet List', alpha: 'Alpha List', num: 'Number List',
     quote: 'Quote', code: 'Code'
 };
 const settingsContainer = document.getElementById('settings-container');
 
+themeToggleBtn.onclick = () => {
+    state.settings.theme = state.settings.theme === 'dark' ? 'light' : 'dark';
+    applySettingsToCSS();
+    triggerSave();
+};
+
 settingsBtn.onclick = () => {
-    sidebar.classList.remove('open');
+    inSettingsMode = true;
+    menuToggle.innerHTML = backArrowSVG;
+    sidebarPages.classList.add('hidden');
+    sidebarSettings.classList.remove('hidden');
     settingsContainer.innerHTML = '';
     
     Object.keys(settingsLabels).forEach(el => {
@@ -486,36 +666,83 @@ settingsBtn.onclick = () => {
         
         const current = state.settings[el] || { font: 'Inter', weight: 400, size: '1rem' };
         
-        ['font', 'weight', 'size'].forEach(prop => {
-            const row = document.createElement('div');
-            row.className = 'setting-row';
-            row.innerHTML = `<label>${prop}</label>
-                <input type="text" id="set-${el}-${prop}" value="${current[prop]}">`;
-            group.appendChild(row);
-        });
+        const fonts = ['Inter', 'Roboto', 'Outfit', 'monospace', 'serif', 'sans-serif', 'Georgia', 'Courier New', 'Times New Roman', 'Arial'];
+        const fontOptions = fonts.map(f => `<option value="${f}" ${current.font === f ? 'selected' : ''}>${f}</option>`).join('');
+        
+        const weights = [300, 400, 500, 600, 700, 800];
+        const weightOptions = weights.map(w => `<option value="${w}" ${parseInt(current.weight) === w ? 'selected' : ''}>${w}</option>`).join('');
+        
+        const currentSize = parseFloat(current.size) || 1.0;
+        
+        group.innerHTML += `
+            <div class="setting-row">
+                <label>Font</label>
+                <select id="set-${el}-font" class="neu-input">
+                    ${fontOptions}
+                </select>
+            </div>
+            <div class="setting-row">
+                <label>Weight</label>
+                <select id="set-${el}-weight" class="neu-input">
+                    ${weightOptions}
+                </select>
+            </div>
+            <div class="setting-row">
+                <label>Size (rem)</label>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <button class="neu-btn size-minus-btn" style="width: 40px; height: 40px; padding: 0;">-</button>
+                    <span id="set-${el}-size-display" style="flex: 1; text-align: center; font-size: 1rem; font-weight: 500;">${currentSize.toFixed(1)}</span>
+                    <button class="neu-btn size-plus-btn" style="width: 40px; height: 40px; padding: 0;">+</button>
+                    <input type="hidden" id="set-${el}-size" value="${currentSize}rem">
+                </div>
+            </div>
+        `;
+        
+        const updateSetting = () => {
+            if(!state.settings[el]) state.settings[el] = {};
+            state.settings[el].font = document.getElementById(`set-${el}-font`).value;
+            state.settings[el].weight = document.getElementById(`set-${el}-weight`).value;
+            state.settings[el].size = document.getElementById(`set-${el}-size`).value;
+            
+            applySettingsToCSS();
+            triggerSave();
+        };
+        
+        group.querySelectorAll('select').forEach(sel => sel.addEventListener('change', updateSetting));
+        
+        group.querySelector('.size-minus-btn').onclick = () => {
+            let size = parseFloat(document.getElementById(`set-${el}-size`).value);
+            size = Math.max(0.5, size - 0.1);
+            document.getElementById(`set-${el}-size`).value = size.toFixed(1) + 'rem';
+            document.getElementById(`set-${el}-size-display`).textContent = size.toFixed(1);
+            updateSetting();
+        };
+        
+        group.querySelector('.size-plus-btn').onclick = () => {
+            let size = parseFloat(document.getElementById(`set-${el}-size`).value);
+            size = Math.min(5.0, size + 0.1);
+            document.getElementById(`set-${el}-size`).value = size.toFixed(1) + 'rem';
+            document.getElementById(`set-${el}-size-display`).textContent = size.toFixed(1);
+            updateSetting();
+        };
         
         settingsContainer.appendChild(group);
     });
-    
-    settingsModal.classList.remove('hidden');
-};
-
-document.getElementById('close-settings-btn').onclick = () => {
-    Object.keys(settingsLabels).forEach(el => {
-        if(!state.settings[el]) state.settings[el] = {};
-        state.settings[el].font = document.getElementById(`set-${el}-font`).value;
-        state.settings[el].weight = document.getElementById(`set-${el}-weight`).value;
-        state.settings[el].size = document.getElementById(`set-${el}-size`).value;
-    });
-    
-    applySettingsToCSS();
-    settingsModal.classList.add('hidden');
-    triggerSave();
 };
 
 function applySettingsToCSS() {
     const root = document.documentElement;
     if(!state.settings) return;
+    
+    if(state.settings.theme === 'dark') {
+        document.body.classList.add('dark-mode');
+        document.querySelector('.sun-icon').classList.remove('hidden');
+        document.querySelector('.moon-icon').classList.add('hidden');
+    } else {
+        document.body.classList.remove('dark-mode');
+        document.querySelector('.sun-icon').classList.add('hidden');
+        document.querySelector('.moon-icon').classList.remove('hidden');
+    }
     
     Object.keys(settingsLabels).forEach(el => {
         const s = state.settings[el];

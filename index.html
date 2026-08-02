@@ -22,23 +22,45 @@
         </button>
 
         <aside id="sidebar" class="sidebar">
-            <div class="sidebar-header">
-                <h2>Pages</h2>
-                <button id="new-page-btn" class="icon-btn" title="New Page">
-                    <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                </button>
+            <div id="sidebar-pages" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
+                <div class="sidebar-header" style="justify-content: flex-end; padding-top: calc(2rem + 4px);">
+                    <div style="display: flex; gap: 0.75rem;">
+                        <button id="theme-toggle-btn" class="neu-btn" style="width: 40px; height: 40px; padding: 0;" title="Toggle Theme">
+                            <svg class="sun-icon hidden" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="19.78" x2="19.78" y2="18.36"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="4.22" x2="19.78" y2="5.64"/></svg>
+                            <svg class="moon-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                        </button>
+                        <button id="new-page-btn" class="neu-btn" style="width: 40px; height: 40px; padding: 0;" title="New Page">
+                            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                        </button>
+                    </div>
+                </div>
+                <div style="padding: 0 1.5rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; margin-top: 1rem;">
+                    <input type="text" id="page-search" placeholder="Search pages..." class="neu-input" style="padding: 0.6rem 1rem; font-size: 0.9rem;">
+                    <select id="page-sort" class="neu-input" style="padding: 0.6rem 1rem; font-size: 0.9rem; width: 100%;">
+                        <option value="edited-new">Edited (Newest)</option>
+                        <option value="edited-old">Edited (Oldest)</option>
+                        <option value="created-new">Created (Newest)</option>
+                        <option value="created-old">Created (Oldest)</option>
+                    </select>
+                </div>
+                <ul id="page-list" class="page-list">
+                    <!-- Pages will be populated here -->
+                </ul>
+                <div class="sidebar-footer" style="display: flex; flex-direction: column; gap: 1rem; padding: 1.5rem; border-top: none; background: transparent;">
+                    <button id="settings-btn" class="neu-btn" style="width: 100%; padding: 0.8rem; font-size: 0.95rem; font-weight: 600;">Settings</button>
+                    <button id="logout-btn" class="neu-btn" style="width: 100%; padding: 0.8rem; font-size: 0.95rem; font-weight: 600;">Log out</button>
+                </div>
             </div>
-            <ul id="page-list" class="page-list">
-                <!-- Pages will be populated here -->
-            </ul>
-            <div class="sidebar-footer">
-                <button id="settings-btn" class="btn text-btn">Settings</button>
-                <button id="logout-btn" class="btn text-btn">Log out</button>
+
+            <div id="sidebar-settings" class="hidden" style="display: flex; flex-direction: column; flex: 1; overflow: hidden; padding-top: calc(2rem + 48px + 1rem);">
+                <div class="settings-scroll" id="settings-container">
+                    <!-- Settings populated by JS -->
+                </div>
             </div>
         </aside>
 
         <main class="main-content">
-            <input type="text" id="page-title" class="page-title-input" placeholder="Page Title" autocomplete="off">
+            <textarea id="page-title" class="page-title-input" placeholder="Page Title" rows="1" autocomplete="off"></textarea>
             <div id="editor" class="editor" contenteditable="true" placeholder="Start writing... Type @ for formatting"></div>
         </main>
         
@@ -59,17 +81,7 @@
         </div>
     </div>
 
-    <div id="settings-modal" class="modal hidden">
-        <div class="modal-content settings-content">
-            <h3>Settings</h3>
-            <div class="settings-scroll" id="settings-container">
-                <!-- Settings populated by JS -->
-            </div>
-            <div class="modal-actions">
-                <button id="close-settings-btn" class="btn primary">Done</button>
-            </div>
-        </div>
-    </div>
+
 
     <script src="app.js"></script>
 </body>
