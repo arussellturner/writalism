@@ -385,14 +385,14 @@ select.neu-input {
 
 
 body.dark-mode {
-    --bg-color: #121212;
+    --bg-color: #000000;
     --text-color: #a0a0a0;
-    --sidebar-bg: #121212;
-    --sidebar-border: #222;
-    --hover-bg: #1a1a1a;
+    --sidebar-bg: #000000;
+    --sidebar-border: #151515;
+    --hover-bg: #111111;
     
-    --neu-light: #1c1c1c;
-    --neu-dark: #080808;
+    --neu-light: #151515;
+    --neu-dark: #000000;
     --neu-shadow: 6px 6px 12px var(--neu-dark), -6px -6px 12px var(--neu-light);
     --neu-inner-shadow: inset 4px 4px 8px var(--neu-dark), inset -4px -4px 8px var(--neu-light);
 }
