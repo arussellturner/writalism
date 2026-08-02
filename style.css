@@ -59,14 +59,26 @@ body {
     min-width: 400px;
 }
 #brand-title {
-    margin-bottom: 2rem; 
+    margin-bottom: 3rem; 
     font-weight: 700; 
-    letter-spacing: -0.02em;
-    font-size: 4rem;
-    color: #ffffff;
-    text-shadow: 0px 4px 15px rgba(0,0,0,0.12);
+    letter-spacing: 0;
+    font-size: 3rem;
     display: flex;
     justify-content: center;
+    gap: 0.6rem;
+}
+#brand-title .char {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 4rem;
+    height: 4.8rem;
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 6px 6px 15px rgba(0,0,0,0.05), -6px -6px 15px rgba(255,255,255,1);
+    border: 1px solid rgba(0,0,0,0.02);
+    color: #ececec;
+    text-shadow: 1px 1px 1px rgba(255,255,255,1), -1px -1px 1px rgba(0,0,0,0.1);
 }
 
 /* Google Auth Button */
@@ -464,9 +476,12 @@ body.dark-mode .format-menu {
 body.dark-mode .login-box {
     background: var(--bg-color);
 }
-body.dark-mode #brand-title {
-    color: var(--bg-color);
-    text-shadow: 0px 4px 15px rgba(255,255,255,0.12);
+body.dark-mode #brand-title .char {
+    background: var(--bg-color);
+    box-shadow: 6px 6px 15px rgba(0,0,0,0.8), -6px -6px 15px rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.05);
+    color: #1a1a1a;
+    text-shadow: 1px 1px 1px rgba(255,255,255,0.1), -1px -1px 1px rgba(0,0,0,0.8);
 }
 body.dark-mode .setting-group {
     background: var(--bg-color);
