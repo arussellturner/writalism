@@ -708,7 +708,10 @@ settingsBtn.onclick = () => {
             triggerSave();
         };
         
-        group.querySelectorAll('select').forEach(sel => sel.addEventListener('change', updateSetting));
+        group.querySelectorAll('select').forEach(sel => {
+            sel.addEventListener('change', updateSetting);
+            enhanceSelect(sel);
+        });
         
         group.querySelector('.size-minus-btn').onclick = () => {
             let size = parseFloat(document.getElementById(`set-${el}-size`).value);
@@ -771,6 +774,8 @@ const loadScript = (src, callback) => {
     document.body.appendChild(script);
 };
 
+enhanceSelect(document.getElementById('page-sort'));
+
 loadScript("https://accounts.google.com/gsi/client", gisLoaded);
 loadScript("https://apis.google.com/js/api.js", gapiLoaded);
 
@@ -796,3 +801,55 @@ function initSplitText() {
 }
 initSplitText();
 
+function enhanceSelect(selectEl) {
+    if (selectEl.dataset.enhanced) return;
+    selectEl.dataset.enhanced = 'true';
+    selectEl.style.display = 'none';
+    
+    const wrapper = document.createElement('div');
+    wrapper.className = 'custom-select-wrapper';
+    
+    const trigger = document.createElement('button');
+    trigger.className = 'custom-select-trigger';
+    const selectedOption = selectEl.options[selectEl.selectedIndex];
+    trigger.innerHTML = `<span>${selectedOption ? selectedOption.text : ''}</span>`;
+    
+    const optionsContainer = document.createElement('div');
+    optionsContainer.className = 'custom-select-options';
+    
+    Array.from(selectEl.options).forEach(opt => {
+        const div = document.createElement('div');
+        div.className = `custom-select-option ${opt.selected ? 'selected' : ''}`;
+        div.textContent = opt.text;
+        div.dataset.value = opt.value;
+        
+        div.onclick = (e) => {
+            e.stopPropagation();
+            selectEl.value = opt.value;
+            trigger.querySelector('span').textContent = opt.text;
+            
+            Array.from(optionsContainer.children).forEach(c => c.classList.remove('selected'));
+            div.classList.add('selected');
+            
+            wrapper.classList.remove('open');
+            selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+        optionsContainer.appendChild(div);
+    });
+    
+    trigger.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const isOpen = wrapper.classList.contains('open');
+        document.querySelectorAll('.custom-select-wrapper').forEach(w => w.classList.remove('open'));
+        if (!isOpen) wrapper.classList.add('open');
+    };
+    
+    wrapper.appendChild(trigger);
+    wrapper.appendChild(optionsContainer);
+    selectEl.parentNode.insertBefore(wrapper, selectEl.nextSibling);
+}
+
+document.addEventListener('click', () => {
+    document.querySelectorAll('.custom-select-wrapper').forEach(w => w.classList.remove('open'));
+});
