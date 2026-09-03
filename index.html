@@ -3,24 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Minimal Writing</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <title>Writalism — Minimalist Writing App</title>
+    <meta name="application-name" content="Writalism">
+    <meta name="description" content="Writalism is a minimal, distraction-free writing app that stores your notes safely and privately in your personal Google Drive.">
+    <meta property="og:title" content="Writalism — Minimalist Writing App">
+    <meta property="og:description" content="A minimal writing app, stored safely and privately in your Google Drive.">
+    <meta property="og:site_name" content="Writalism">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="login-screen">
-        <div class="login-box">
-            <h1 id="brand-title" class="split-text-anim">Writalism</h1>
-            <p class="brand-tagline">A minimal writing app, stored safely and privately in your Google Drive</p>
-            <button id="auth-button" class="neu-btn auth-btn">
-                <div class="google-logo-gradient"></div>
-                Sign in with Google
-            </button>
-            <div class="login-footer">
-                <a href="privacy.html" class="legal-link">Privacy Policy</a>
-                <span class="legal-dot">•</span>
-                <a href="terms.html" class="legal-link">Terms of Service</a>
-            </div>
+        <div class="landing-container">
+            <header class="landing-hero">
+                <div class="login-box">
+                    <h1 id="brand-title" class="split-text-anim">Writalism</h1>
+                    <p class="brand-tagline">A minimal writing app, stored safely and privately in your Google Drive</p>
+                    <button id="auth-button" class="neu-btn auth-btn">
+                        <div class="google-logo-gradient"></div>
+                        Sign in with Google
+                    </button>
+                </div>
+            </header>
+
+            <section class="landing-content">
+                <div class="landing-section">
+                    <h2>What is Writalism?</h2>
+                    <p>
+                        Writalism is a minimal, distraction-free text editor designed for pure writing and thought organization. Whether you are journaling, drafting essays, or capturing quick notes, Writalism gets out of your way so you can focus entirely on your words.
+                    </p>
+                </div>
+
+                <div class="landing-grid">
+                    <div class="landing-card">
+                        <div class="landing-card-icon">🔒</div>
+                        <h3>Private by Design</h3>
+                        <p>Your writing never touches a third-party server or database. All documents and settings reside exclusively inside your personal Google Drive application data folder.</p>
+                    </div>
+
+                    <div class="landing-card">
+                        <div class="landing-card-icon">☁️</div>
+                        <h3>Seamless Cloud Sync</h3>
+                        <p>Everything you write is continuously and automatically synchronized to your personal Google Drive, keeping your work safe and accessible across your devices.</p>
+                    </div>
+
+                    <div class="landing-card">
+                        <div class="landing-card-icon">✍️</div>
+                        <h3>Distraction-Free Editor</h3>
+                        <p>Enjoy clean typography, custom font styling, intuitive keyboard formatting shortcuts, and instant dark mode without visual clutter.</p>
+                    </div>
+                </div>
+
+                <div class="landing-section">
+                    <h2>How We Use Google Data</h2>
+                    <p>
+                        Writalism requests only the <code>drive.appdata</code> permission to create and update a dedicated configuration file (<code>minimal_writing_data.json</code>) inside your personal Google Drive. We do not access your personal files, emails, or contacts. Your data is never sold, shared, or used to train artificial intelligence models.
+                    </p>
+                </div>
+            </section>
+
+            <footer class="landing-footer">
+                <div class="footer-links">
+                    <a href="privacy.html" class="legal-link">Privacy Policy</a>
+                    <span class="legal-dot">•</span>
+                    <a href="terms.html" class="legal-link">Terms of Service</a>
+                </div>
+                <p class="footer-copy">&copy; 2026 Writalism. All rights reserved.</p>
+            </footer>
         </div>
     </div>
 

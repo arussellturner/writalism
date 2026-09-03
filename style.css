@@ -41,22 +41,137 @@ body {
 
 .hidden { display: none !important; }
 
-/* Login Screen */
+/* Login Screen & Public Landing Page */
 #login-screen {
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
+    min-height: 100vh;
     height: 100vh;
+    overflow-y: auto;
     background: #f6f4f0;
+    padding: 2rem 1.5rem 5rem;
+    box-sizing: border-box;
 }
+
+.landing-container {
+    width: 100%;
+    max-width: 780px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.landing-hero {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 3.5rem 0 2rem;
+}
+
 .login-box {
     background: #f6f4f0;
-    padding: 4rem 3rem;
+    padding: 1.5rem;
     text-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-width: 400px;
+    width: 100%;
+    max-width: 500px;
+}
+
+.landing-content {
+    width: 100%;
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.landing-section {
+    background: #ffffff;
+    padding: 2.25rem 2.5rem;
+    border-radius: 18px;
+    border: 1px solid #e7e4dc;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+}
+
+.landing-section h2 {
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin-bottom: 0.85rem;
+    color: #1a1a1a;
+    letter-spacing: -0.01em;
+}
+
+.landing-section p {
+    font-size: 1.02rem;
+    line-height: 1.65;
+    color: #555555;
+}
+
+.landing-section code {
+    font-family: monospace;
+    background: #f0ece5;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.landing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
+    width: 100%;
+}
+
+.landing-card {
+    background: #ffffff;
+    padding: 1.75rem 1.5rem;
+    border-radius: 18px;
+    border: 1px solid #e7e4dc;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+}
+
+.landing-card-icon {
+    font-size: 1.75rem;
+    line-height: 1;
+}
+
+.landing-card h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.landing-card p {
+    font-size: 0.92rem;
+    line-height: 1.55;
+    color: #666666;
+}
+
+.landing-footer {
+    margin-top: 3.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.footer-links {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.footer-copy {
+    font-size: 0.8rem;
+    color: #999999;
 }
 #brand-title {
     margin-bottom: 0.75rem; 
@@ -528,6 +643,27 @@ body.dark-mode .login-box {
 }
 body.dark-mode .brand-tagline {
     color: #8c8a85;
+}
+body.dark-mode .landing-section,
+body.dark-mode .landing-card {
+    background: #141414;
+    border-color: #262626;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+body.dark-mode .landing-section h2,
+body.dark-mode .landing-card h3 {
+    color: #e5e5e5;
+}
+body.dark-mode .landing-section p,
+body.dark-mode .landing-card p {
+    color: #999999;
+}
+body.dark-mode .landing-section code {
+    background: #222222;
+    color: #d4d4d4;
+}
+body.dark-mode .footer-copy {
+    color: #666666;
 }
 body.dark-mode #brand-title .char {
     background: var(--bg-color);
