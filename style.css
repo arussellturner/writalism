@@ -59,7 +59,7 @@ body {
     min-width: 400px;
 }
 #brand-title {
-    margin-bottom: 2rem; 
+    margin-bottom: 0.75rem; 
     font-weight: 700; 
     letter-spacing: -0.02em;
     font-size: 5rem;
@@ -75,6 +75,16 @@ body {
 }
 #brand-title .char {
     display: inline-block;
+}
+
+.brand-tagline {
+    font-size: 1.05rem;
+    font-weight: 400;
+    color: #78746e;
+    margin-bottom: 2.25rem;
+    max-width: 380px;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
 }
 
 #login-screen .auth-btn {
@@ -515,6 +525,9 @@ body.dark-mode .format-menu {
 }
 body.dark-mode .login-box {
     background: var(--bg-color);
+}
+body.dark-mode .brand-tagline {
+    color: #8c8a85;
 }
 body.dark-mode #brand-title .char {
     background: var(--bg-color);
