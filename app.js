@@ -110,7 +110,7 @@ function formatSyncTimestamp(timestamp) {
     const day = date.getDate();
     const year = date.getFullYear();
 
-    return `${hours}:${minutes}<span class="sync-colon">:</span><span class="sync-seconds">${seconds}</span> ${ampm} ${month}/${day}/${year}`;
+    return `${hours}:${minutes}<span class="sync-colon">:</span><span class="sync-seconds">${seconds}</span> <span class="sync-ampm">${ampm}</span> &bull; ${month}/${day}/${year}`;
 }
 
 function updateSyncStatus(status, text, timestamp) {

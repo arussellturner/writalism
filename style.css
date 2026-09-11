@@ -449,14 +449,17 @@ body {
 }
 
 .sync-text {
-    display: inline-flex;
-    align-items: center;
     white-space: nowrap;
 }
 
 .sync-colon,
 .sync-seconds {
     font-weight: 200;
+}
+
+.sync-ampm {
+    font-weight: 500;
+    margin-left: 0.25rem;
 }
 
 
