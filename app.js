@@ -3,10 +3,20 @@ const CLIENT_ID = '593289261918-4or87gs5krjoildr9n694j2hr7f93n2m.apps.googleuser
 const DISCOVERY_DOCS = ["https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
 const SCOPES = 'https://www.googleapis.com/auth/drive.appdata';
 
+// Session & Storage Keys
+const STORAGE_TOKEN_KEY = 'minimal_writing_token';
+const STORAGE_EXPIRES_KEY = 'writalism_token_expires_at';
+const STORAGE_KEEP_SIGNED_IN_KEY = 'writalism_keep_signed_in';
+const STORAGE_CACHED_STATE_KEY = 'writalism_cached_state';
+const STORAGE_PENDING_SYNC_KEY = 'writalism_pending_sync';
+
 let tokenClient;
 let gapiInited = false;
 let gisInited = false;
 let accessToken = null;
+let refreshTimer = null;
+let dataFileId = null;
+let currentSyncState = 'synced'; // 'synced' | 'syncing' | 'warning'
 
 // Application State
 let state = {
@@ -25,12 +35,25 @@ let state = {
     }
 };
 
-let dataFileId = null;
+// Immediately restore cached state from localStorage so documents are available with zero delay
+try {
+    const cachedRaw = localStorage.getItem(STORAGE_CACHED_STATE_KEY);
+    if (cachedRaw) {
+        const cachedData = JSON.parse(cachedRaw);
+        state = { ...state, ...cachedData };
+        if (!state.settings) state.settings = {};
+    }
+} catch (e) {
+    console.warn("Writalism: Failed to parse cached state", e);
+}
 
 // DOM Elements
 const loginScreen = document.getElementById('login-screen');
 const appScreen = document.getElementById('app');
 const authBtn = document.getElementById('auth-button');
+const keepSignedInLogin = document.getElementById('keep-signed-in-login');
+const syncStatusPill = document.getElementById('sync-status');
+const reconnectBtn = document.getElementById('reconnect-btn');
 const menuToggle = document.getElementById('menu-toggle');
 const sidebar = document.getElementById('sidebar');
 const pageList = document.getElementById('page-list');
@@ -44,6 +67,87 @@ const deleteModal = document.getElementById('delete-modal');
 const sidebarPages = document.getElementById('sidebar-pages');
 const sidebarSettings = document.getElementById('sidebar-settings');
 const themeToggleBtn = document.getElementById('theme-toggle-btn');
+
+// --- Session & Storage Helpers ---
+function getKeepSignedIn() {
+    return localStorage.getItem(STORAGE_KEEP_SIGNED_IN_KEY) !== 'false';
+}
+
+function setKeepSignedIn(enabled) {
+    localStorage.setItem(STORAGE_KEEP_SIGNED_IN_KEY, enabled ? 'true' : 'false');
+    if (keepSignedInLogin) keepSignedInLogin.checked = !!enabled;
+    const settingsSwitch = document.getElementById('keep-signed-in-setting');
+    if (settingsSwitch) settingsSwitch.checked = !!enabled;
+}
+
+function isTokenValid() {
+    if (!accessToken) return false;
+    const expiresAtStr = localStorage.getItem(STORAGE_EXPIRES_KEY);
+    if (!expiresAtStr) return true;
+    const expiresAt = parseInt(expiresAtStr, 10);
+    return Date.now() < (expiresAt - 60000); // Valid if >60 seconds remaining
+}
+
+function cacheStateLocally() {
+    try {
+        localStorage.setItem(STORAGE_CACHED_STATE_KEY, JSON.stringify(state));
+    } catch(e) {
+        console.warn("Writalism: Failed to cache state locally", e);
+    }
+}
+
+function updateSyncStatus(status, text) {
+    if (!syncStatusPill) return;
+    currentSyncState = status;
+    syncStatusPill.classList.remove('hidden', 'syncing', 'warning', 'error');
+    const syncText = syncStatusPill.querySelector('.sync-text');
+    
+    if (status === 'syncing') {
+        syncStatusPill.classList.add('syncing');
+        if (reconnectBtn) reconnectBtn.classList.add('hidden');
+    } else if (status === 'warning' || status === 'error') {
+        syncStatusPill.classList.add('warning');
+        if (reconnectBtn) reconnectBtn.classList.remove('hidden');
+    } else {
+        if (reconnectBtn) reconnectBtn.classList.add('hidden');
+    }
+    if (syncText && text) syncText.textContent = text;
+}
+
+function scheduleTokenRefresh(expiresInSeconds) {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    const refreshDelayMs = Math.max(30000, (expiresInSeconds - 300) * 1000);
+    refreshTimer = setTimeout(() => {
+        if (getKeepSignedIn() && tokenClient) {
+            console.log("Writalism: Auto-renewing Google Drive access token...");
+            try {
+                tokenClient.requestAccessToken({ prompt: '' });
+            } catch (err) {
+                console.warn("Writalism: Background token refresh error", err);
+            }
+        }
+    }, refreshDelayMs);
+}
+
+function requestAuth(interactive = true) {
+    if (CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
+        alert("Please set your Google Client ID in app.js before authenticating.");
+        return;
+    }
+    if (!tokenClient) return;
+
+    const previouslyAuthed = !!localStorage.getItem(STORAGE_TOKEN_KEY) || getKeepSignedIn();
+    const promptValue = (interactive && !previouslyAuthed) ? 'consent' : '';
+
+    try {
+        tokenClient.requestAccessToken({ prompt: promptValue });
+    } catch (err) {
+        console.warn("Writalism: requestAccessToken error", err);
+        if (interactive) {
+            tokenClient.requestAccessToken({ prompt: 'consent' });
+        }
+    }
+}
 
 // --- Google API Initialization ---
 function gapiLoaded() {
@@ -61,10 +165,28 @@ function gisLoaded() {
         client_id: CLIENT_ID,
         scope: SCOPES,
         callback: (resp) => {
-            if (resp.error !== undefined) throw (resp);
+            if (resp.error !== undefined) {
+                console.warn("Writalism: GIS auth callback error:", resp);
+                if (resp.error === 'popup_blocked_by_browser' || resp.error === 'immediate_failed') {
+                    updateSyncStatus('warning', 'Sync Paused');
+                }
+                return;
+            }
             accessToken = resp.access_token;
-            localStorage.setItem('minimal_writing_token', accessToken);
+            const expiresIn = resp.expires_in || 3600;
+            const expiresAt = Date.now() + (expiresIn * 1000);
+
+            localStorage.setItem(STORAGE_TOKEN_KEY, accessToken);
+            localStorage.setItem(STORAGE_EXPIRES_KEY, expiresAt.toString());
+            gapi.client.setToken({ access_token: accessToken });
+
+            updateSyncStatus('synced', 'Synced');
             showApp();
+            scheduleTokenRefresh(expiresIn);
+
+            if (localStorage.getItem(STORAGE_PENDING_SYNC_KEY) === 'true') {
+                saveToDrive();
+            }
         },
     });
     gisInited = true;
@@ -72,39 +194,103 @@ function gisLoaded() {
 }
 
 function checkAuth() {
-    if (gapiInited && gisInited) {
-        const savedToken = localStorage.getItem('minimal_writing_token');
-        if (savedToken) {
-            gapi.client.setToken({ access_token: savedToken });
-            accessToken = savedToken;
+    if (!gapiInited || !gisInited) return;
+
+    const savedToken = localStorage.getItem(STORAGE_TOKEN_KEY);
+    const keepSignedIn = getKeepSignedIn();
+
+    if (savedToken) {
+        accessToken = savedToken;
+        gapi.client.setToken({ access_token: savedToken });
+
+        if (isTokenValid()) {
+            const expiresAt = parseInt(localStorage.getItem(STORAGE_EXPIRES_KEY) || '0', 10);
+            const remainingSec = Math.max(60, Math.floor((expiresAt - Date.now()) / 1000));
+            scheduleTokenRefresh(remainingSec);
+            updateSyncStatus('synced', 'Synced');
             showApp();
+        } else if (keepSignedIn) {
+            updateSyncStatus('warning', 'Sync Paused');
+            showApp();
+            try {
+                tokenClient.requestAccessToken({ prompt: '' });
+            } catch (e) {
+                console.warn("Writalism: Background silent renewal blocked", e);
+            }
         }
+    } else if (keepSignedIn && state.pages && state.pages.length > 0) {
+        showApp();
+        updateSyncStatus('warning', 'Sync Paused');
     }
 }
 
 authBtn.onclick = () => {
-    if (CLIENT_ID === 'YOUR_GOOGLE_CLIENT_ID_HERE') {
-        alert("Please set your Google Client ID in app.js before authenticating.");
-        return;
+    if (keepSignedInLogin) {
+        setKeepSignedIn(keepSignedInLogin.checked);
     }
-    tokenClient.requestAccessToken({prompt: 'consent'});
+    requestAuth(true);
 };
 
+if (reconnectBtn) {
+    reconnectBtn.onclick = (e) => {
+        e.stopPropagation();
+        requestAuth(true);
+    };
+}
+
+if (keepSignedInLogin) {
+    keepSignedInLogin.checked = getKeepSignedIn();
+    keepSignedInLogin.addEventListener('change', (e) => {
+        setKeepSignedIn(e.target.checked);
+    });
+}
+
 logoutBtn.onclick = () => {
-    localStorage.removeItem('minimal_writing_token');
+    if (refreshTimer) clearTimeout(refreshTimer);
+    const oldToken = accessToken;
+    accessToken = null;
+    dataFileId = null;
+    localStorage.removeItem(STORAGE_TOKEN_KEY);
+    localStorage.removeItem(STORAGE_EXPIRES_KEY);
+    localStorage.removeItem(STORAGE_KEEP_SIGNED_IN_KEY);
+    localStorage.removeItem(STORAGE_PENDING_SYNC_KEY);
+    if (oldToken && window.google && google.accounts && google.accounts.oauth2) {
+        try {
+            google.accounts.oauth2.revoke(oldToken, () => {
+                location.reload();
+            });
+            return;
+        } catch (e) {}
+    }
     location.reload();
 };
 
-async function showApp() {
+async function showApp(skipDriveSync = false) {
     loginScreen.classList.add('hidden');
     appScreen.classList.remove('hidden');
-    await loadDataFromDrive();
+
+    if (state.pages && state.pages.length > 0) {
+        if (!state.activePageId || !state.pages.find(p => p.id === state.activePageId)) {
+            state.activePageId = state.pages[0].id;
+        }
+        loadPage(state.activePageId);
+    }
+
     applySettingsToCSS();
     renderSidebar();
+
+    if (!skipDriveSync && isTokenValid()) {
+        await loadDataFromDrive();
+    }
 }
 
 // --- Drive Operations ---
 async function loadDataFromDrive() {
+    if (localStorage.getItem(STORAGE_PENDING_SYNC_KEY) === 'true') {
+        await saveToDrive();
+        return;
+    }
+
     try {
         let response = await gapi.client.drive.files.list({
             spaces: 'appDataFolder',
@@ -127,31 +313,51 @@ async function loadDataFromDrive() {
                 let data = await fileResponse.json();
                 state = { ...state, ...data };
                 if (!state.settings) state.settings = {};
-            } else {
-                console.error("Failed to load file content.");
+                cacheStateLocally();
+                updateSyncStatus('synced', 'Synced');
+            } else if (fileResponse.status === 401) {
+                updateSyncStatus('warning', 'Sync Paused');
             }
         } else {
-            state.pages = [{ id: Date.now().toString(), title: 'Untitled', content: '<div><br></div>', created: Date.now(), lastModified: Date.now() }];
-            state.activePageId = state.pages[0].id;
+            if (!state.pages || state.pages.length === 0) {
+                state.pages = [{ id: Date.now().toString(), title: 'Untitled', content: '<div><br></div>', created: Date.now(), lastModified: Date.now() }];
+                state.activePageId = state.pages[0].id;
+            }
             await saveToDrive(true);
         }
         
         if (!state.activePageId && state.pages.length > 0) {
             state.activePageId = state.pages[0].id;
         }
-        if(state.activePageId) loadPage(state.activePageId);
+        if (state.activePageId) loadPage(state.activePageId);
     } catch (err) {
-        console.error("Drive load error", err);
+        console.error("Writalism: Drive load error", err);
         if (err.status === 401) {
-            localStorage.removeItem('minimal_writing_token');
-            location.reload();
+            updateSyncStatus('warning', 'Sync Paused');
+            if (getKeepSignedIn() && tokenClient) {
+                try {
+                    tokenClient.requestAccessToken({ prompt: '' });
+                } catch (e) {}
+            }
         }
     }
 }
 
 async function saveToDrive(isNew = false) {
-    if (!accessToken) return;
+    cacheStateLocally();
+
+    if (!accessToken || !isTokenValid()) {
+        localStorage.setItem(STORAGE_PENDING_SYNC_KEY, 'true');
+        updateSyncStatus('warning', 'Sync Paused');
+        if (getKeepSignedIn() && tokenClient) {
+            try {
+                tokenClient.requestAccessToken({ prompt: '' });
+            } catch (e) {}
+        }
+        return;
+    }
     
+    updateSyncStatus('syncing', 'Saving...');
     const fileContent = JSON.stringify(state);
 
     try {
@@ -165,7 +371,11 @@ async function saveToDrive(isNew = false) {
                 body: JSON.stringify({ name: 'minimal_writing_data.json', parents: ['appDataFolder'] })
             });
             if (metaRes.status === 401) {
-                alert("Your session has expired! Please copy any unsaved writing, refresh the page, and sign in again.");
+                localStorage.setItem(STORAGE_PENDING_SYNC_KEY, 'true');
+                updateSyncStatus('warning', 'Sync Paused');
+                if (getKeepSignedIn() && tokenClient) {
+                    tokenClient.requestAccessToken({ prompt: '' });
+                }
                 return;
             }
             if (!metaRes.ok) throw new Error("Failed to create file");
@@ -183,26 +393,38 @@ async function saveToDrive(isNew = false) {
         });
         
         if (uploadRes.status === 401) {
-            alert("Your session has expired! Please copy any unsaved writing, refresh the page, and sign in again.");
+            localStorage.setItem(STORAGE_PENDING_SYNC_KEY, 'true');
+            updateSyncStatus('warning', 'Sync Paused');
+            if (getKeepSignedIn() && tokenClient) {
+                tokenClient.requestAccessToken({ prompt: '' });
+            }
             return;
         }
+
+        if (uploadRes.ok) {
+            localStorage.removeItem(STORAGE_PENDING_SYNC_KEY);
+            updateSyncStatus('synced', 'Saved');
+        }
     } catch(e) {
-        console.error("Save error", e);
+        console.error("Writalism: Save error", e);
+        localStorage.setItem(STORAGE_PENDING_SYNC_KEY, 'true');
+        updateSyncStatus('warning', 'Sync Paused');
     }
 }
 
-// Debounce save (triggers automatically every few seconds on edit)
+// Debounce save (triggers automatically on edit while caching instantly)
 let saveTimeout;
 function triggerSave() {
+    const page = state.pages.find(p => p.id === state.activePageId);
+    if (page) {
+        page.title = pageTitle.value;
+        page.content = editor.innerHTML;
+        page.lastModified = Date.now();
+    }
+    cacheStateLocally();
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => {
-        const page = state.pages.find(p => p.id === state.activePageId);
-        if (page) {
-            page.title = pageTitle.value;
-            page.content = editor.innerHTML;
-            page.lastModified = Date.now();
-            renderSidebar();
-        }
+        renderSidebar();
         saveToDrive();
     }, 1000);
 }
@@ -236,15 +458,20 @@ pageTitle.addEventListener('keydown', (e) => {
     }
 });
 
-// Fade out menu button when typing
+// Fade out menu button & sync indicator when typing
 editor.addEventListener('keydown', (e) => {
-    // Only fade if it's a character or structural key
     if(e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace') {
         menuToggle.classList.add('fade-out');
+        if (syncStatusPill && currentSyncState === 'synced') {
+            syncStatusPill.classList.add('fade-out');
+        }
     }
 });
 
-const showMenuBtn = () => menuToggle.classList.remove('fade-out');
+const showMenuBtn = () => {
+    menuToggle.classList.remove('fade-out');
+    if (syncStatusPill) syncStatusPill.classList.remove('fade-out');
+};
 document.addEventListener('mousemove', showMenuBtn);
 document.addEventListener('mousedown', showMenuBtn);
 document.addEventListener('touchstart', showMenuBtn);
@@ -659,6 +886,53 @@ settingsBtn.onclick = () => {
     sidebarSettings.classList.remove('hidden');
     settingsContainer.innerHTML = '';
     
+    // Account & Session Group
+    const sessionGroup = document.createElement('div');
+    sessionGroup.className = 'setting-group';
+    sessionGroup.innerHTML = `
+        <h4>Account & Session</h4>
+        <div class="setting-row">
+            <div class="setting-toggle-row">
+                <label style="margin: 0; font-size: 0.95rem; text-transform: none; color: var(--text-color); font-weight: 500;">Keep Me Signed In</label>
+                <label class="neu-switch">
+                    <input type="checkbox" id="keep-signed-in-setting" ${getKeepSignedIn() ? 'checked' : ''}>
+                    <span class="neu-switch-slider"></span>
+                </label>
+            </div>
+            <p class="setting-help-text">Preserves your active session and refreshes Google Drive access in the background so you never lose writing time.</p>
+        </div>
+        <div class="setting-row" style="margin-top: 1rem; border-top: 1px solid var(--sidebar-border); padding-top: 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+                <div>
+                    <div style="font-size: 0.85rem; font-weight: 500;">Google Drive Sync</div>
+                    <div id="settings-sync-desc" class="setting-help-text" style="margin-top: 0.2rem;">${accessToken && isTokenValid() ? 'Connected & Synced' : 'Authorization Paused'}</div>
+                </div>
+                <button id="settings-sync-btn" class="neu-btn" style="padding: 0.5rem 0.9rem; font-size: 0.8rem; font-weight: 600; white-space: nowrap;">
+                    ${accessToken && isTokenValid() ? 'Sync Now' : 'Reconnect'}
+                </button>
+            </div>
+        </div>
+    `;
+    settingsContainer.appendChild(sessionGroup);
+
+    const keepSettingInput = sessionGroup.querySelector('#keep-signed-in-setting');
+    if (keepSettingInput) {
+        keepSettingInput.addEventListener('change', (e) => {
+            setKeepSignedIn(e.target.checked);
+        });
+    }
+
+    const settingsSyncBtn = sessionGroup.querySelector('#settings-sync-btn');
+    if (settingsSyncBtn) {
+        settingsSyncBtn.addEventListener('click', () => {
+            if (accessToken && isTokenValid()) {
+                saveToDrive();
+            } else {
+                requestAuth(true);
+            }
+        });
+    }
+
     Object.keys(settingsLabels).forEach(el => {
         const group = document.createElement('div');
         group.className = 'setting-group';
@@ -853,3 +1127,9 @@ function enhanceSelect(selectEl) {
 document.addEventListener('click', () => {
     document.querySelectorAll('.custom-select-wrapper').forEach(w => w.classList.remove('open'));
 });
+
+// Render cached notes immediately if user chose to stay signed in and has previous session/notes
+if (getKeepSignedIn() && (localStorage.getItem(STORAGE_TOKEN_KEY) || (state.pages && state.pages.length > 0))) {
+    showApp(true);
+}
+

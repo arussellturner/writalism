@@ -23,6 +23,13 @@
                         <div class="google-logo-gradient"></div>
                         Sign in with Google
                     </button>
+                    <div class="login-session-option">
+                        <label class="session-checkbox-label" title="Keep session active and renew Google Drive authorization seamlessly">
+                            <input type="checkbox" id="keep-signed-in-login" checked>
+                            <span class="custom-check-box"></span>
+                            <span class="checkbox-text">Keep me signed in</span>
+                        </label>
+                    </div>
                 </div>
             </header>
 
@@ -77,6 +84,12 @@
         <button id="menu-toggle" class="icon-btn" aria-label="Toggle Menu">
             <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
         </button>
+
+        <div id="sync-status" class="sync-status-pill hidden" title="Google Drive sync status">
+            <span class="sync-dot"></span>
+            <span class="sync-text">Saved</span>
+            <button id="reconnect-btn" class="reconnect-pill-btn hidden">Reconnect</button>
+        </div>
 
         <aside id="sidebar" class="sidebar">
             <div id="sidebar-pages" style="display: flex; flex-direction: column; flex: 1; overflow: hidden;">
