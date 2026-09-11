@@ -448,6 +448,18 @@ body {
     transform: scale(0.95);
 }
 
+.sync-text {
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.sync-colon,
+.sync-seconds {
+    font-weight: 200;
+}
+
+
 /* Sidebar */
 .sidebar {
     width: 320px;

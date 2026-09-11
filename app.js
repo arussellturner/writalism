@@ -9,6 +9,7 @@ const STORAGE_EXPIRES_KEY = 'writalism_token_expires_at';
 const STORAGE_KEEP_SIGNED_IN_KEY = 'writalism_keep_signed_in';
 const STORAGE_CACHED_STATE_KEY = 'writalism_cached_state';
 const STORAGE_PENDING_SYNC_KEY = 'writalism_pending_sync';
+const STORAGE_LAST_SYNCED_KEY = 'writalism_last_synced_time';
 
 let tokenClient;
 let gapiInited = false;
@@ -96,7 +97,23 @@ function cacheStateLocally() {
     }
 }
 
-function updateSyncStatus(status, text) {
+function formatSyncTimestamp(timestamp) {
+    const date = timestamp ? new Date(timestamp) : new Date();
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const year = date.getFullYear();
+
+    return `${hours}:${minutes}<span class="sync-colon">:</span><span class="sync-seconds">${seconds}</span> ${ampm} ${month}/${day}/${year}`;
+}
+
+function updateSyncStatus(status, text, timestamp) {
     if (!syncStatusPill) return;
     currentSyncState = status;
     syncStatusPill.classList.remove('hidden', 'syncing', 'warning', 'error');
@@ -105,14 +122,28 @@ function updateSyncStatus(status, text) {
     if (status === 'syncing') {
         syncStatusPill.classList.add('syncing');
         if (reconnectBtn) reconnectBtn.classList.add('hidden');
+        if (syncText) syncText.innerHTML = text || 'Saving...';
     } else if (status === 'warning' || status === 'error') {
         syncStatusPill.classList.add('warning');
         if (reconnectBtn) reconnectBtn.classList.remove('hidden');
+        if (syncText) syncText.innerHTML = text || 'Sync Paused';
     } else {
         if (reconnectBtn) reconnectBtn.classList.add('hidden');
+
+        let ts = timestamp;
+        if (!ts) {
+            const savedTs = localStorage.getItem(STORAGE_LAST_SYNCED_KEY);
+            ts = savedTs ? parseInt(savedTs, 10) : Date.now();
+        }
+        localStorage.setItem(STORAGE_LAST_SYNCED_KEY, ts.toString());
+
+        const label = (text && text !== 'Synced') ? text : 'Saved';
+        if (syncText) {
+            syncText.innerHTML = `${label} &bull; ${formatSyncTimestamp(ts)}`;
+        }
     }
-    if (syncText && text) syncText.textContent = text;
 }
+
 
 function scheduleTokenRefresh(expiresInSeconds) {
     if (refreshTimer) clearTimeout(refreshTimer);
@@ -254,6 +285,7 @@ logoutBtn.onclick = () => {
     localStorage.removeItem(STORAGE_EXPIRES_KEY);
     localStorage.removeItem(STORAGE_KEEP_SIGNED_IN_KEY);
     localStorage.removeItem(STORAGE_PENDING_SYNC_KEY);
+    localStorage.removeItem(STORAGE_LAST_SYNCED_KEY);
     if (oldToken && window.google && google.accounts && google.accounts.oauth2) {
         try {
             google.accounts.oauth2.revoke(oldToken, () => {
@@ -278,6 +310,11 @@ async function showApp(skipDriveSync = false) {
 
     applySettingsToCSS();
     renderSidebar();
+
+    const savedTs = localStorage.getItem(STORAGE_LAST_SYNCED_KEY);
+    if (savedTs) {
+        updateSyncStatus('synced', 'Saved', parseInt(savedTs, 10));
+    }
 
     if (!skipDriveSync && isTokenValid()) {
         await loadDataFromDrive();
@@ -314,7 +351,8 @@ async function loadDataFromDrive() {
                 state = { ...state, ...data };
                 if (!state.settings) state.settings = {};
                 cacheStateLocally();
-                updateSyncStatus('synced', 'Synced');
+                const fileModifiedTime = dataFile.modifiedTime ? new Date(dataFile.modifiedTime).getTime() : Date.now();
+                updateSyncStatus('synced', 'Saved', fileModifiedTime);
             } else if (fileResponse.status === 401) {
                 updateSyncStatus('warning', 'Sync Paused');
             }
@@ -403,7 +441,7 @@ async function saveToDrive(isNew = false) {
 
         if (uploadRes.ok) {
             localStorage.removeItem(STORAGE_PENDING_SYNC_KEY);
-            updateSyncStatus('synced', 'Saved');
+            updateSyncStatus('synced', 'Saved', Date.now());
         }
     } catch(e) {
         console.error("Writalism: Save error", e);
